@@ -1,0 +1,148 @@
+substitutions:
+  device_name: "living-room-led-display"
+  pretty_name: "Living Room LED Display"
+  outside_temp_sensor: "sensor.air_ar_00017281_temperature"
+  outside_humidity_sensor: "sensor.air_ar_00017281_humidity"
+  inside_temp_sensor: "sensor.nest_temperature_sensor_kitchen_temperature"
+
+esphome:
+  name: ${device_name}
+  platform: ESP8266
+  board: d1_mini
+  esp8266_restore_from_flash: true
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+logger:
+
+api:
+
+ota:
+
+time:
+  - platform: homeassistant
+    id: homeassistant_time
+
+web_server:
+  port: 80
+
+font:
+  - file: 'ledfont.ttf'
+    id: font1
+    size: 8
+
+spi:
+  clk_pin: D0
+  mosi_pin: D1
+
+display:
+  - platform: max7219digit
+    id: screen
+    cs_pin: D2
+    num_chips: 4
+    intensity: 0
+    lambda: |-
+      int x_start, y_start;
+      int width, height;
+      if (id(hastatus).state) {
+        switch(static_cast<int>(id(msg).state)) {
+          case 0:
+            it.print(16, 3, id(font1), TextAlign::CENTER, "Outsd");
+            break;
+          case 1 ... 4:
+            if (id(outside_temp).has_state()) {
+              it.printf(16, 3, id(font1), TextAlign::CENTER, "%.1f°", id(outside_temp).state);
+            } else {
+              it.print(16, 3, id(font1), TextAlign::CENTER, "---");
+            }
+            it.line(31, 0 + ((id(msg).state - 1 ) * 2), 31, 8);
+            break;
+          case 5:
+            it.print(16, 3, id(font1), TextAlign::CENTER, "Humdy");
+            break;
+          case 6 ... 9:
+            if (id(outside_humidity).has_state()) {
+              it.printf(16, 3, id(font1), TextAlign::CENTER, "%.0f%%", id(outside_humidity).state);
+            } else {
+              it.print(16, 3, id(font1), TextAlign::CENTER, "---");
+            }
+            it.line(31, 0 + ((id(msg).state - 6 ) * 2), 31, 8);
+            break;
+          case 10:
+            it.print(16, 3, id(font1), TextAlign::CENTER, "Insde");
+            break;
+          case 11 ... 14:
+            if (id(inside_temp).has_state()) {
+              it.printf(16, 3, id(font1), TextAlign::CENTER, "%.1f°", id(inside_temp).state);
+            } else {
+              it.print(16, 3, id(font1), TextAlign::CENTER, "---");
+            }
+            it.line(31, 0 + ((id(msg).state - 11 ) * 2), 31, 8);
+            break;
+        }
+      } else {
+        it.scroll(true, max7219digit::CONTINUOUS, 40, 0, 0);
+        it.print(0, -2, id(font1), " Waiting for Home Assistant to adopt me... ");
+      }
+
+binary_sensor:
+  - platform: status
+    name: "${pretty_name} Status"
+    id: hastatus
+
+number:
+  - platform: template
+    name: "${pretty_name} Screen Selector"
+    min_value: 0
+    max_value: 100
+    step: 1
+    optimistic: true
+    id: msg
+    disabled_by_default: true
+
+interval:
+  - interval: 1.5s
+    then:
+      lambda: |-
+        id(msg).state++;
+        
+        if (id(msg).state >= 15) {
+          id(msg).state=0;
+        }
+
+switch:
+  - platform: restart
+    name: "${pretty_name} Restart"
+    disabled_by_default: true
+
+
+sensor:
+  - platform: wifi_signal
+    nameretty_name} WiFi Signal"
+    update_interval: 60s
+    
+  - platform: uptime
+    name: "${pretty_name} Uptime"
+
+  - platform: homeassistant
+    name: "Outside Temperature Sensor"
+    entity_id: ${outside_temp_sensor}
+    id: outside_temp
+    
+  - platform: homeassistant
+    name: "Outside Humidity"
+    entity_id: ${outside_humidity_sensor}
+    id: outside_humidity
+    
+  - platform: homeassistant
+    name: "Inside Temperature Sensor"
+    entity_id: ${inside_temp_sensor}
+    id: inside_temp
+    
+text_sensor:
+  - platform: version
+    name: "${pretty_name} ESPHome"
+    
+
